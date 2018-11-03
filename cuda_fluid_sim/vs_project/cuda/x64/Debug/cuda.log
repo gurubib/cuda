@@ -1,0 +1,14 @@
+﻿  
+  C:\Users\Acer\Documents\Visual Studio 2015\Projects\cuda\cuda>"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v9.0\bin\nvcc.exe" -ccbin "E:\Programs\VC\bin\x86_amd64" -x cu  -IE:\BME\4felev\grafika\openglh\openglh\Libs\freeglut\include -I"E:\BME\4felev\grafika\openglh\openglh\Libs\glew-1.13.0\include" -IE:\BME\4felev\grafika\openglh\openglh\Libs\freeglut\include -I"E:\BME\4felev\grafika\openglh\openglh\Libs\glew-1.13.0\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v9.0\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v9.0\include"  -G   --keep-dir x64\Debug -maxrregcount=0  --machine 64 --compile   -g   -DWIN32 -DWIN64 -D_DEBUG -D_CONSOLE -D_MBCS -Xcompiler "/EHsc /W3 /nologo /Od /FS /Zi /RTC1 /MDd " -o x64\Debug\kernel.cu.obj "C:\Users\Acer\Documents\Visual Studio 2015\Projects\cuda\cuda\kernel.cu" -clean 
+  kernel.cu
+  Compiling CUDA source file kernel.cu...
+  
+  C:\Users\Acer\Documents\Visual Studio 2015\Projects\cuda\cuda>"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v9.0\bin\nvcc.exe" -gencode=arch=compute_30,code=\"sm_30,compute_30\" --use-local-env --cl-version 2015 -ccbin "E:\Programs\VC\bin\x86_amd64" -x cu  -IE:\BME\4felev\grafika\openglh\openglh\Libs\freeglut\include -I"E:\BME\4felev\grafika\openglh\openglh\Libs\glew-1.13.0\include" -IE:\BME\4felev\grafika\openglh\openglh\Libs\freeglut\include -I"E:\BME\4felev\grafika\openglh\openglh\Libs\glew-1.13.0\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v9.0\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v9.0\include"  -G   --keep-dir x64\Debug -maxrregcount=0  --machine 64 --compile -cudart static  -g   -DWIN32 -DWIN64 -D_DEBUG -D_CONSOLE -D_MBCS -Xcompiler "/EHsc /W3 /nologo /Od /FS /Zi /RTC1 /MDd " -o x64\Debug\kernel.cu.obj "C:\Users\Acer\Documents\Visual Studio 2015\Projects\cuda\cuda\kernel.cu" 
+  kernel.cu
+  main.cpp
+  cuda.vcxproj -> C:\Users\Acer\Documents\Visual Studio 2015\Projects\cuda\x64\Debug\cuda.exe
+  cuda.vcxproj -> C:\Users\Acer\Documents\Visual Studio 2015\Projects\cuda\x64\Debug\cuda.pdb (Full PDB)
+  copy "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v9.0\bin\cudart*.dll" "C:\Users\Acer\Documents\Visual Studio 2015\Projects\cuda\x64\Debug\"
+  C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v9.0\bin\cudart32_90.dll
+  C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v9.0\bin\cudart64_90.dll
+          2 file(s) copied.
