@@ -51,12 +51,18 @@ void display() {
 	glDisable(GL_DEPTH_TEST);
 
 	simulationStep();
-	if (i++ % 5 == 0) {
+	if (i++ % 3 == 0) {
 		//addForce(0, 256, make_float2(0.0f, 0.0f), densityColor, width, height);
-		//addForce(0, 375, make_float2(0.0f, 0.0f), densityColor, width, height);
+		//addForce(200, 375, make_float2(0.0f, 0.0f), densityColor, width, height);
 		//addForce(0, 460, make_float2(0.0f, 0.0f), densityColor, width, height);
 	}
 	visualizationStep(visualizationMethod, width, height);
+
+	float2 p1 = make_float2((100 - width / 2.0) / (width / 2.0), (300 - height / 2.0) / (height / 2.0));
+	float2 p2 = make_float2((201 - width / 2.0) / (width / 2.0), (401 - height / 2.0) / (height / 2.0));
+
+	glColor3f(0.0f, 1.0f, 0.6f);
+	glRectf(p1.x, p1.y, p2.x, p2.y);
 
 	glEnable(GL_DEPTH_TEST);
 	glutSwapBuffers();
@@ -125,10 +131,10 @@ void mouseClick(int button, int state, int x, int y) {
 
 //Handling the user input and controlling the simulation
 void mouseMove(int x, int y) {
-	force.x = 2*(float)(x - mX);
-	force.y = -2*(float)(y - mY);
+	force.x = 2 * (float)(x - mX);
+	force.y = -2 * (float)(y - mY);
 	//addForce(mX, height - mY, force, densityColor,width,height);
-	addForce(256, 256, force*2, densityColor, width, height);
+	addForce(256, 256, force * 2, densityColor, width, height);
 	mX = x;
 	mY = y;
 }

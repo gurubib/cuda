@@ -72,7 +72,7 @@ bool isInside(int gridResolution, int2 id,  int* boundaryBuffer) {
 __device__
 void initBoundaryBuffer(int gridResolution,int2 id, int* boundaryBuffer) {
 	if ((id.x > 0 && id.x < gridResolution - 1 && id.y > 0 && id.y < gridResolution-1) &&
-		((id.x < 300 || id.x > 400) || (id.y < 300 || id.y >400))) {
+		((id.x < 100 || id.x > 200) || (id.y < 300 || id.y >400))) {
 		boundaryBuffer[id.x + id.y * gridResolution] = 0;
 	}
 	else {
@@ -97,6 +97,8 @@ int2 calculateBoundaryNeighbour(int gridResolution,int2 id, int* boundaryBuffer)
 			}
 		}
 	}
+	tempid.y++;
+	return tempid;
 }
 
 ////ENDOF device functions
@@ -116,7 +118,7 @@ void resetSimulation(const int gridResolution,
 		blockIdx.y * blockDim.y + threadIdx.y);
 
 	if (id.x < gridResolution && id.y < gridResolution) {
-		velocityBuffer[id.x + id.y * gridResolution] = make_float2(0.0f, 0.0f);
+		velocityBuffer[id.x + id.y * gridResolution] = make_float2(5.0f, 0.0f);
 		pressureBuffer[id.x + id.y * gridResolution] = 0.0f;
 		densityBuffer[id.x + id.y * gridResolution] = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
 
@@ -140,8 +142,28 @@ void advection(const int gridResolution,
 		outputVelocityBuffer[id.x + id.y * gridResolution] = getBil(p, gridResolution, inputVelocityBuffer);// +make_float2(0.05f, 0.0f);
 	}
 	else {
-		int2 tempid = calculateBoundaryNeighbour(gridResolution, id, boundaryBuffer);
-		outputVelocityBuffer[id.x + id.y * gridResolution] = -inputVelocityBuffer[tempid.x + tempid.y * gridResolution];
+		float2 tempvelocity = make_float2(0.0f);
+		int n = 0;
+		if (boundaryBuffer[id.x + 1 + id.y * gridResolution] == 0) {
+			tempvelocity += inputVelocityBuffer[id.x + 1 + id.y * gridResolution];
+			n++;
+		}
+		if (boundaryBuffer[id.x - 1 + id.y * gridResolution] == 0) {
+			tempvelocity += inputVelocityBuffer[id.x - 1 + id.y * gridResolution];
+			n++;
+		}
+		if (boundaryBuffer[id.x + (id.y + 1) * gridResolution] == 0) {
+			tempvelocity += inputVelocityBuffer[id.x + (id.y + 1) * gridResolution];
+			n++;
+		}
+		if (boundaryBuffer[id.x + (id.y - 1) * gridResolution] == 0) {
+			tempvelocity += inputVelocityBuffer[id.x + (id.y - 1) * gridResolution];
+			n++;
+		}
+		if(n!=0)
+		outputVelocityBuffer[id.x + id.y * gridResolution] = -(tempvelocity / n);
+		else
+		outputVelocityBuffer[id.x + id.y * gridResolution] = -inputVelocityBuffer[id.x + id.y * gridResolution];
 	}
 }
 
@@ -160,6 +182,8 @@ void advectionDensity(const int gridResolution,
 		float2 p = make_float2((float)id.x - dt * velocity.x, (float)id.y - dt * velocity.y);
 
 		outputDensityBuffer[id.x + id.y * gridResolution] = getBil4(p, gridResolution, inputDensityBuffer);
+		if (id.x == 1 && id.y % 2 == 0)
+			outputDensityBuffer[id.x + id.y * gridResolution] += make_float4(1.0f);
 	}
 	else {
 		outputDensityBuffer[id.x + id.y * gridResolution] = make_float4(0.0f,0.0f,0.0f,0.0f);
@@ -186,7 +210,11 @@ void diffusion(const int gridResolution,
 
 		float2 velocity = inputVelocityBuffer[id.x + id.y * gridResolution];
 
-		outputVelocityBuffer[id.x + id.y * gridResolution] = (vL + vR + vB + vT + alpha * velocity) * beta;
+		outputVelocityBuffer[id.x + id.y * gridResolution] = (vL + vR + vB + vT +alpha * velocity) * beta;
+		if (id.x == 1 && id.y % 3 == 0)
+			outputVelocityBuffer[id.x + id.y * gridResolution] += make_float2(20.0f,0.0f);
+
+
 	}
 	else {
 		outputVelocityBuffer[id.x + id.y * gridResolution] = inputVelocityBuffer[id.x + id.y * gridResolution];
@@ -328,7 +356,25 @@ void addForce(const float x, const float y, const float2 force,
 	velocityBuffer[id.x + id.y * gridResolution] += c * force;
 	densityBuffer[id.x + id.y * gridResolution] += c * density;
 }
+/*__global__
+void addForcetoSide(const float2 force,
+	const int gridResolution, float2* velocityBuffer,
+	const float4 density, float4* densityBuffer) {
+	int2 id = make_int2(blockIdx.x * blockDim.x + threadIdx.x,
+		blockIdx.y * blockDim.y + threadIdx.y);
+	float x = 1;
+	//float y = gridResolution / 2;
+	float dx = ((float)id.x / (float)gridResolution) - x;
+	float dy = ((float)id.y / (float)gridResolution);
 
+	float radius = 0.001f;
+
+	float c = exp(-(dx * dx + dy * dy) / radius) * dt;
+
+	velocityBuffer[id.x + id.y * gridResolution] += c * force;
+	densityBuffer[id.x + id.y * gridResolution] += c * density;
+}
+*/
 // *************
 // Visualization
 // *************
@@ -561,6 +607,16 @@ void addForce(int x, int y, float2 force, float4 densityColor, int width, int he
 		d_densityBuffer[inputDensityBuffer]
 		);
 }
+/*void addForcetoSide(float2 force, float4 densityColor, int width, int height) {
+
+	addForcetoSide << <numBlocks, threadsPerBlock >> >(
+		force,
+		gridResolution,
+		d_velocityBuffer[inputVelocityBuffer],
+		densityColor,
+		d_densityBuffer[inputDensityBuffer]
+		);
+}*/
 
 void simulationStep() {
 	simulateAdvection();
