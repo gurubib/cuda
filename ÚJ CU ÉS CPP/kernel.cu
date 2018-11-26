@@ -2,6 +2,10 @@
 
 #pragma region Kernel_code
 
+int gridResolution = 512;
+int * boundaryBuffer = new int[gridResolution * gridResolution];
+float4 * imageBuffer = new float4[gridResolution*gridResolution];
+
 ////Defining required device functions for the calculations
 __device__
 float4 cross(float4 a, float4 b) {
@@ -66,7 +70,37 @@ float4 getBil4(float2 p, int gridResolution, float4* buffer) {
 
 __device__
 bool isInside(int gridResolution, int2 id,  int* boundaryBuffer) {
+	//return (boundaryBuffer[id.x + id.y * gridResolution] == 0);
 	return (boundaryBuffer[id.x + id.y * gridResolution] == 0);
+}
+
+void readBoundaryImage() {
+	//char* imageName = "rx8_2.jpg";
+	char* imageName = "danube.jpg";
+	Mat img = imread(imageName, CV_LOAD_IMAGE_GRAYSCALE);
+	unsigned char * input = (unsigned char *)(img.data);
+
+	//boundaryBuffer = new int[gridResolution * gridResolution];
+
+	for (int i = 0; i < img.rows; ++i) {
+		for (int j = 0; j < img.cols; ++j) {
+			int idx = img.step[0] * i + j;
+			boundaryBuffer[idx] = (input[img.step[0] * (img.rows - 1 - i) + j] < 210) ? 1 : 0;
+			if ((i == 0) || (j == 0) || (i == gridResolution - 1) || (j == gridResolution - 1))
+				boundaryBuffer[idx] = 1;
+		}
+	}
+	Mat imgc = imread(imageName, CV_LOAD_IMAGE_COLOR);
+	unsigned char * inputc = (unsigned char *)(imgc.data);
+	for (int i = 0; i < imgc.rows; ++i) {
+		for (int j = 0; j < imgc.step[0]; j+=3) {
+			int idx = imgc.step[0] * (imgc.rows - 1 - i) + j;
+			float4 temp = make_float4(inputc[idx+2], inputc[idx + 1], inputc[idx], 0);
+			temp = temp / 255;
+			idx = imgc.step[0] * i / 3 + j / 3;
+			imageBuffer[idx] = temp;
+		}
+	}
 }
 
 __device__
@@ -122,7 +156,8 @@ void resetSimulation(const int gridResolution,
 		pressureBuffer[id.x + id.y * gridResolution] = 0.0f;
 		densityBuffer[id.x + id.y * gridResolution] = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
 
-		initBoundaryBuffer(gridResolution,id,boundaryBuffer);
+		//initBoundaryBuffer(gridResolution,id,boundaryBuffer);
+
 	}
 }
 
@@ -182,7 +217,7 @@ void advectionDensity(const int gridResolution,
 		float2 p = make_float2((float)id.x - dt * velocity.x, (float)id.y - dt * velocity.y);
 
 		outputDensityBuffer[id.x + id.y * gridResolution] = getBil4(p, gridResolution, inputDensityBuffer);
-		if (id.x == 1 && id.y % 2 == 0)
+		if ((id.x == 1 || id.x == 3 || id.x == 30) && id.y % 2 == 0 && id.y >130 && id.y < 190)
 			outputDensityBuffer[id.x + id.y * gridResolution] += make_float4(1.0f);
 	}
 	else {
@@ -211,8 +246,10 @@ void diffusion(const int gridResolution,
 		float2 velocity = inputVelocityBuffer[id.x + id.y * gridResolution];
 
 		outputVelocityBuffer[id.x + id.y * gridResolution] = (vL + vR + vB + vT +alpha * velocity) * beta;
-		if (id.x == 1 && id.y % 3 == 0)
-			outputVelocityBuffer[id.x + id.y * gridResolution] += make_float2(20.0f,0.0f);
+		if ((id.x == 1 || id.x == 3) && id.y % 3 == 0) {
+			outputVelocityBuffer[id.x + id.y * gridResolution] += make_float2(10.0f, 0.0f);
+			outputVelocityBuffer[id.x + id.y * gridResolution] += make_float2(10.0f, 0.0f);
+		}
 
 
 	}
@@ -309,8 +346,31 @@ void pressureJacobi(const int gridResolution,
 		outputPressureBuffer[id.x + id.y * gridResolution] = (vL + vR + vB + vT + alpha * divergence) * beta;
 	}
 	else {
-		int2 tempid = calculateBoundaryNeighbour(gridResolution, id, boundaryBuffer);
-		outputPressureBuffer[id.x + id.y * gridResolution] = -inputPressureBuffer[tempid.x + tempid.y * gridResolution];
+		//int2 tempid = calculateBoundaryNeighbour(gridResolution, id, boundaryBuffer);
+		//outputPressureBuffer[id.x + id.y * gridResolution] = -inputPressureBuffer[tempid.x + tempid.y * gridResolution];
+		
+		float temppressure = 0.0f;
+		int n = 0;
+		if (boundaryBuffer[id.x + 1 + id.y * gridResolution] == 0) {
+			temppressure += inputPressureBuffer[id.x + 1 + id.y * gridResolution];
+			n++;
+		}
+		if (boundaryBuffer[id.x - 1 + id.y * gridResolution] == 0) {
+			temppressure += inputPressureBuffer[id.x - 1 + id.y * gridResolution];
+			n++;
+		}
+		if (boundaryBuffer[id.x + (id.y + 1) * gridResolution] == 0) {
+			temppressure += inputPressureBuffer[id.x + (id.y + 1) * gridResolution];
+			n++;
+		}
+		if (boundaryBuffer[id.x + (id.y - 1) * gridResolution] == 0) {
+			temppressure += inputPressureBuffer[id.x + (id.y - 1) * gridResolution];
+			n++;
+		}
+		if (n != 0)
+			outputPressureBuffer[id.x + id.y * gridResolution] = -(temppressure / n);
+		else
+			outputPressureBuffer[id.x + id.y * gridResolution] = -inputPressureBuffer[id.x + id.y * gridResolution];
 	}
 }
 
@@ -334,8 +394,30 @@ void projection(const int gridResolution,
 		outputVelocityBuffer[id.x + id.y * gridResolution] = velocity -  /* 0.5f **//* (1.0f / 256.0f) **/ make_float2(pR - pL, pT - pB);
 	}
 	else {
-		int2 tempid = calculateBoundaryNeighbour(gridResolution, id, boundaryBuffer);
-		outputVelocityBuffer[id.x + id.y * gridResolution] = -inputVelocityBuffer[tempid.x + tempid.y * gridResolution];
+		//int2 tempid = calculateBoundaryNeighbour(gridResolution, id, boundaryBuffer);
+		//outputVelocityBuffer[id.x + id.y * gridResolution] = -inputVelocityBuffer[tempid.x + tempid.y * gridResolution];
+		float2 tempvelocity = make_float2(0.0f);
+		int n = 0;
+		if (boundaryBuffer[id.x + 1 + id.y * gridResolution] == 0) {
+			tempvelocity += inputVelocityBuffer[id.x + 1 + id.y * gridResolution];
+			n++;
+		}
+		if (boundaryBuffer[id.x - 1 + id.y * gridResolution] == 0) {
+			tempvelocity += inputVelocityBuffer[id.x - 1 + id.y * gridResolution];
+			n++;
+		}
+		if (boundaryBuffer[id.x + (id.y + 1) * gridResolution] == 0) {
+			tempvelocity += inputVelocityBuffer[id.x + (id.y + 1) * gridResolution];
+			n++;
+		}
+		if (boundaryBuffer[id.x + (id.y - 1) * gridResolution] == 0) {
+			tempvelocity += inputVelocityBuffer[id.x + (id.y - 1) * gridResolution];
+			n++;
+		}
+		if (n != 0)
+			outputVelocityBuffer[id.x + id.y * gridResolution] = -(tempvelocity / n);
+		else
+			outputVelocityBuffer[id.x + id.y * gridResolution] = -inputVelocityBuffer[id.x + id.y * gridResolution];
 	}
 }
 
@@ -381,7 +463,7 @@ void addForcetoSide(const float2 force,
 
 __global__
 void visualizationDensity(const int width, const int height, float4* visualizationBuffer,
-	const int gridResolution, float4* densityBuffer) {
+	const int gridResolution, float4* densityBuffer, int* boundaryBuffer, float4* imageBuffer) {
 	int2 id = make_int2(blockIdx.x * blockDim.x + threadIdx.x,
 		blockIdx.y * blockDim.y + threadIdx.y);
 
@@ -389,11 +471,16 @@ void visualizationDensity(const int width, const int height, float4* visualizati
 		float4 density = densityBuffer[id.x + id.y * width];
 		visualizationBuffer[id.x + id.y * width] = density;
 	}
+	if (!isInside(gridResolution, id, boundaryBuffer)) {
+		//visualizationBuffer[id.x + id.y * width] = make_float4(0.8f, 0.2f,0.1f, 1.0f);
+		float4 density = imageBuffer[id.x + id.y * width];
+		visualizationBuffer[id.x + id.y * width] = density;
+	}
 }
 
 __global__
 void visualizationVelocity(const int width, const int height, float4* visualizationBuffer,
-	const int gridResolution, float2* velocityBuffer) {
+	const int gridResolution, float2* velocityBuffer, int* boundaryBuffer, float4* imageBuffer) {
 	int2 id = make_int2(blockIdx.x * blockDim.x + threadIdx.x,
 		blockIdx.y * blockDim.y + threadIdx.y);
 
@@ -401,17 +488,25 @@ void visualizationVelocity(const int width, const int height, float4* visualizat
 		float2 velocity = velocityBuffer[id.x + id.y * width];
 		visualizationBuffer[id.x + id.y * width] = make_float4(((1.0f + velocity) / 2.0f).x, ((1.0f + velocity) / 2.0f).y, 0.0f, 0.0f);
 	}
+	if (!isInside(gridResolution, id, boundaryBuffer)) {
+		float4 density = imageBuffer[id.x + id.y * width];
+		visualizationBuffer[id.x + id.y * width] = density;
+	}
 }
 
 __global__
 void visualizationPressure(const int width, const int height, float4* visualizationBuffer,
-	const int gridResolution, float* pressureBuffer) {
+	const int gridResolution, float* pressureBuffer, int* boundaryBuffer,float4* imageBuffer) {
 	int2 id = make_int2(blockIdx.x * blockDim.x + threadIdx.x,
 		blockIdx.y * blockDim.y + threadIdx.y);
 
 	if (id.x < width && id.y < height) {
 		float pressure = pressureBuffer[id.x + id.y * width];
 		visualizationBuffer[id.x + id.y * width] = make_float4((1.0f + pressure) / 2.0f);
+	}
+	if (!isInside(gridResolution, id, boundaryBuffer)) {
+		float4 density = imageBuffer[id.x + id.y * width];
+		visualizationBuffer[id.x + id.y * width] = density;
 	}
 }
 
@@ -421,8 +516,6 @@ void visualizationPressure(const int width, const int height, float4* visualizat
 
 ////Variables for the simulation
 //d_ indicates that the variable is a pointer to the device memory
-
-int gridResolution = 512;
 
 int inputVelocityBuffer = 0;
 float2* d_velocityBuffer[2];
@@ -441,8 +534,11 @@ size_t problemSize[2];
 float4* d_visualizationBufferGPU;
 float4* visualizationBufferCPU;
 
-int* d_boundaryBuffer;
+//int* d_boundaryBuffer;
 
+int * d_boundaryBuffer;
+
+float4* d_imageBuffer;
 size_t visualizationSize[2];
 
 ////Blocks, threads
@@ -450,6 +546,8 @@ dim3 threadsPerBlock(16, 16);
 dim3 numBlocks(gridResolution / threadsPerBlock.x, gridResolution / threadsPerBlock.y);
 
 void initSimulation(int width, int height) {
+
+	readBoundaryImage();
 	// simulation
 	problemSize[0] = gridResolution;
 	problemSize[1] = gridResolution;
@@ -475,7 +573,12 @@ void initSimulation(int width, int height) {
 
 	//boundaryBuffer
 	cudaMalloc((void**)&d_boundaryBuffer, sizeof(int)*gridResolution*gridResolution);
+	//cudaMalloc((void**)&d_boundaryMap, sizeof(int)*gridResolution*gridResolution);
 
+	cudaMalloc((void**)&d_imageBuffer, sizeof(float4)*gridResolution*gridResolution);
+
+	cudaMemcpy(d_boundaryBuffer, boundaryBuffer, sizeof(int) * gridResolution * gridResolution, cudaMemcpyHostToDevice);
+	cudaMemcpy(d_imageBuffer, imageBuffer, sizeof(float4) * gridResolution * gridResolution, cudaMemcpyHostToDevice);
 	// visualization
 	visualizationSize[0] = width;
 	visualizationSize[1] = height;
@@ -485,6 +588,10 @@ void initSimulation(int width, int height) {
 
 	//GPU visualizationBuffer
 	cudaMalloc((void**)&d_visualizationBufferGPU, sizeof(float4)*width*height);
+
+	
+
+
 }
 
 void resetSimulationHost() {
@@ -634,7 +741,9 @@ void visualizationStep(int visualizationMethod, int width, int height) {
 			height,
 			d_visualizationBufferGPU,
 			gridResolution,
-			d_densityBuffer[inputDensityBuffer]
+			d_densityBuffer[inputDensityBuffer],
+			d_boundaryBuffer,
+			d_imageBuffer
 			);
 		break;
 	case 1:
@@ -643,7 +752,9 @@ void visualizationStep(int visualizationMethod, int width, int height) {
 			height,
 			d_visualizationBufferGPU,
 			gridResolution,
-			d_velocityBuffer[inputVelocityBuffer]
+			d_velocityBuffer[inputVelocityBuffer],
+			d_boundaryBuffer,
+			d_imageBuffer
 			);
 
 		break;
@@ -653,7 +764,9 @@ void visualizationStep(int visualizationMethod, int width, int height) {
 			height,
 			d_visualizationBufferGPU,
 			gridResolution,
-			d_pressureBuffer[inputPressureBuffer]
+			d_pressureBuffer[inputPressureBuffer],
+			d_boundaryBuffer,
+			d_imageBuffer
 			);
 		break;
 

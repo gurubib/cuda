@@ -3,6 +3,7 @@
 
 #include "kernel.h"
 
+
 /////Variables for controlling the simulation, these are changed by the user input
 
 //Force
@@ -62,7 +63,7 @@ void display() {
 	float2 p2 = make_float2((201 - width / 2.0) / (width / 2.0), (401 - height / 2.0) / (height / 2.0));
 
 	glColor3f(0.0f, 1.0f, 0.6f);
-	glRectf(p1.x, p1.y, p2.x, p2.y);
+	//glRectf(p1.x, p1.y, p2.x, p2.y);
 
 	glEnable(GL_DEPTH_TEST);
 	glutSwapBuffers();
@@ -148,6 +149,8 @@ void reshape(int newWidth, int newHeight) {
 
 //Starting glut, openGL, simulation
 int main(int argc, char* argv[]) {
+
+
 	glutInit(&argc, argv);
 	glutInitContextVersion(3, 0);
 	glutInitContextFlags(GLUT_CORE_PROFILE | GLUT_DEBUG);
